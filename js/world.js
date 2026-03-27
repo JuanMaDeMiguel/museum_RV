@@ -76,8 +76,8 @@ class World extends Simu {
         const moldeVentana4 = PRIMS.wall("mv4", {largeur: 4, hauteur: 5}, scene);
         moldeVentana3.scaling.z = 5; 
         moldeVentana4.scaling.z = 5;
-        moldeVentana3.position = new BABYLON.Vector3(-7.5, 2, 0); 
-        moldeVentana4.position = new BABYLON.Vector3(7.5, 3, 0); //adelante
+        moldeVentana3.position = new BABYLON.Vector3(-7.5, 1, 0); 
+        moldeVentana4.position = new BABYLON.Vector3(7.5, 1, 0); //adelante
 
         // Pared Derecha (mur3)
         const mur3_base = PRIMS.wall("wall-right-base", {materiau: materiau1, largeur: 30, hauteur: 10}, scene);
