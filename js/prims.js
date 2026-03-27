@@ -27,7 +27,7 @@ function creerCamera(name, options, scn) {
   camera.keysDown = [83, 40];  // S y Flecha Abajo
   camera.inertia = 0.01;
   camera.angularSensibility = 1000;
-  camera.speed = 10
+  camera.speed = 10;
 
 
   return camera
@@ -354,71 +354,45 @@ function creerCloisonAvecTrous(nom, opts, scn) {
   for (let i = 0; i < trous.length; i++) {
     let trouOpts = trous[i];
     if (trouOpts.fenetre) {
-
-      if (scn.textures.find(t => t.name === trouOpts.materiau)) {
-        boisMat.diffuseTexture = new BABYLON.Texture(trouOpts.materiau)
-      } else {
-        boisMat.diffuseTexture = new BABYLON.Texture("./assets/rock.jpg", scn);
-      }
+      // 1. Marco: Usa la textura pasada en opts, o 240.jpg por defecto
+      let texturaMarco = trouOpts.materiau || "./assets/240.jpg";
+      boisMat.diffuseTexture = new BABYLON.Texture(texturaMarco, scn);
       boisMat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
-      // Reflejo ambiental (HDR o skybox)
-      var hdrTexture = new BABYLON.HDRCubeTexture("./assets/skybox/partly_cloudy_puresky.hdr", scn, 512);
 
-      // Skybox
-      var hdrSkybox = BABYLON.Mesh.CreateBox("hdrSkyBox", 1000.0, scn);
-      var hdrSkyboxMaterial = new BABYLON.PBRMaterial("skyBox", scn);
-      hdrSkyboxMaterial.backFaceCulling = false;
-      hdrSkyboxMaterial.reflectionTexture = hdrTexture.clone();
-      hdrSkyboxMaterial.reflectionTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE;
-      hdrSkyboxMaterial.microSurface = 1.0;
-      hdrSkyboxMaterial.cameraExposure = 0.66;
-      hdrSkyboxMaterial.cameraContrast = 1.66;
-      hdrSkyboxMaterial.disableLighting = true;
-      hdrSkybox.material = hdrSkyboxMaterial;
-      hdrSkybox.infiniteDistance = true;
+      // 2. Vidrio: Material estándar translúcido, sin depender de HDR
+      var glassMat = new BABYLON.StandardMaterial("glass", scn);
+      glassMat.diffuseColor = new BABYLON.Color3(0.6, 0.8, 1.0); // Tono celeste
+      glassMat.alpha = 0.4; // Transparencia
+      glassMat.backFaceCulling = false;
 
-
-      var glass = new BABYLON.PBRMaterial("glass", scn);
-      glass.reflectionTexture = hdrTexture;
-      glass.indexOfRefraction = 0.52;
-      glass.alpha = 0.5;
-      glass.directIntensity = 0.0;
-      glass.environmentIntensity = 0.7;
-      glass.cameraExposure = 0.66;
-      glass.cameraContrast = 1.66;
-      glass.microSurface = 1;
-      glass.reflectivityColor = new BABYLON.Color3(0.2, 0.2, 0.2);
-      glass.albedoColor = new BABYLON.Color3(0.95, 0.95, 0.95);
-
-
-      let frameOpts = trouOpts
-      frameOpts.materiau = boisMat
+      let frameOpts = trouOpts;
+      frameOpts.materiau = boisMat;
       let frameGroupe = creerCloison(`trou_frame_${nom}_${i}`, frameOpts, scn);
-      frameGroupe.parent = nouvelleCloison
+      frameGroupe.parent = nouvelleCloison;
       let pos = frameOpts.position || new BABYLON.Vector3(0, frameOpts.hauteur / 2.0, 0);
-      frameGroupe.position = pos//nouvelleCloison.position.add(pos)
-      let frame = frameGroupe.getChildMeshes()[0]
+      frameGroupe.position = pos;
+      let frame = frameGroupe.getChildMeshes()[0];
       let csgFrame = BABYLON.CSG.FromMesh(frame);
 
-      let glassOpts = trouOpts
-      glassOpts.largeur *= 0.85
-      glassOpts.hauteur *= 0.85
+      let glassOpts = trouOpts;
+      glassOpts.largeur *= 0.85;
+      glassOpts.hauteur *= 0.85;
       glassOpts.position = new BABYLON.Vector3(0, 0, 0);
-      glassOpts.position.y += (- (frameOpts.hauteur / 2)) //(glassOpts.hauteur*0.075)
-      glassOpts.materiau = glass
+      glassOpts.position.y += (- (frameOpts.hauteur / 2));
+      glassOpts.materiau = glassMat; // Asignamos el nuevo material de vidrio
+
       let glassGroupe = creerCloison(`trou_glass_${nom}_${i}`, glassOpts, scn);
-      glassGroupe.position = frame.position.add(glassOpts.position)
-      glassGroupe.parent = frameGroupe
-      let glassMesh = glassGroupe.getChildMeshes()[0]
+      glassGroupe.position = frame.position.add(glassOpts.position);
+      glassGroupe.parent = frameGroupe;
+      let glassMesh = glassGroupe.getChildMeshes()[0];
       let csgGlass = BABYLON.CSG.FromMesh(glassMesh);
 
-      csgFrame = csgFrame.subtract(csgGlass)
-      //glassMesh.dispose()
+      csgFrame = csgFrame.subtract(csgGlass);
 
       const nouvelleFrame = csgFrame.toMesh(`frame_bois_${nom}_${i}`, frame.material, scn);
       nouvelleFrame.checkCollisions = true;
-      nouvelleFrame.parent = frameGroupe
-      frame.dispose()
+      nouvelleFrame.parent = frameGroupe;
+      frame.dispose();
     }
   }
 
@@ -428,42 +402,85 @@ function creerCloisonAvecTrous(nom, opts, scn) {
   return groupe;
 }
 
-
 function creerPorte(nom, opts, scn) {
-
   let options = opts || {};
-  let hauteur = options.height || 3.0;
-  let largeur = options.width || 5.0;
+  let hauteur = options.hauteur || 3.0; // Cambiado a 'hauteur' para ser consistente
+  let largeur = options.largeur || 5.0; // Cambiado a 'largeur'
   let epaisseur = options.epaisseur || 0.1;
-  let ndoors = 1
+  let ndoors = 1;
 
-  //const materiau = new BABYLON.StandardMaterial("door_metal", scn);
   let materiau;
   let groupe = new BABYLON.TransformNode("groupe-" + nom);
 
-  if (options.type == "coulissante") {
-    // Matériau en verre noir translucide
-    materiau = new BABYLON.StandardMaterial("verre_noir", scn);
+  if (options.type === "coulissante") {
+    materiau = new BABYLON.StandardMaterial("verre_noir_" + nom, scn);
     materiau.diffuseColor = new BABYLON.Color3(0, 0, 0);
     materiau.alpha = 0.6;
-    materiau.hasAlpha = true;
     materiau.specularColor = new BABYLON.Color3(0.2, 0.2, 0.2);
     materiau.backFaceCulling = false;
-    ndoors = 2
+    ndoors = 2;
   } else {
+    // Corrección del crash: instanciar antes de asignar textura
+    materiau = new BABYLON.StandardMaterial("mat_porte_" + nom, scn);
     materiau.diffuseTexture = new BABYLON.Texture("./assets/ceilling.jpg", scn);
   }
 
   for (let i = 0; i < ndoors; i++) {
-    let door = BABYLON.MeshBuilder.CreateBox(nom + i, { width: largeur / ndoors, height: hauteur, depth: epaisseur }, scn);
-    door.material = materiau
-    door.checkCollisions = true
-    door.parent = groupe
-    door.position.x = door.position.x + (-1 + (2 * i)) * largeur / 4
+    let door = BABYLON.MeshBuilder.CreateBox(nom + "_" + i, { width: largeur / ndoors, height: hauteur, depth: epaisseur }, scn);
+    door.material = materiau;
+    door.parent = groupe;
+
+    // Elevación consistente con creerCloison
+    door.position.y = hauteur / 2.0;
+    door.checkCollisions = true;
+
+    // Posicionamiento en X y apertura parcial (exigida en el proyecto)
+    if (ndoors === 1) {
+      // Puerta simple: se desplaza a un lado para dejar hueco
+      door.position.x = largeur * 0.4;
+    } else {
+      // Puerta doble: se calcula la posición base y se le suma un offset de apertura
+      let basePos = (-1 + (2 * i)) * (largeur / 4);
+      let offsetApertura = (-1 + (2 * i)) * (largeur * 0.3); // Abre un 20% hacia cada lado
+      door.position.x = basePos + offsetApertura;
+    }
   }
 
-  return groupe
+  return groupe;
 }
+// function creerPorte(nom, opts, scn) {
+//
+//   let options = opts || {};
+//   let hauteur = options.hauteur || 3.0;
+//   let largeur = options.largeur || 5.0;
+//   let epaisseur = options.epaisseur || 0.1;
+//   let ndoors = 1
+//
+//   //const materiau = new BABYLON.StandardMaterial("door_metal", scn);
+//   let materiau;
+//   let groupe = new BABYLON.TransformNode("groupe-" + nom);
+//
+//   if (options.type == "coulissante") {
+//     // Matériau en verre noir translucide
+//     materiau = new BABYLON.StandardMaterial("verre_noir", scn);
+//     materiau.diffuseColor = new BABYLON.Color3(0, 0, 0);
+//     materiau.alpha = 0.6;
+//     materiau.hasAlpha = true;
+//     materiau.specularColor = new BABYLON.Color3(0.2, 0.2, 0.2);
+//     materiau.backFaceCulling = false;
+//     ndoors = 2
+//   } else {
+//     materiau.diffuseTexture = new BABYLON.Texture("./assets/ceilling.jpg", scn);
+//   }
+//
+//   for (let i = 0; i < ndoors; i++) {
+//     let door = BABYLON.MeshBuilder.CreateBox(nom + i, { width: largeur / ndoors, height: hauteur, depth: epaisseur }, scn);
+//     door.material = materiau
+//     door.position.x = door.position.x + (-1 + (2 * i)) * largeur / 4
+//   }
+//
+//   return groupe
+// }
 
 
 // function to impor a .glb file
