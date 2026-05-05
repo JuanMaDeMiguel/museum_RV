@@ -349,24 +349,27 @@ function creerCloisonAvecTrous(nom, opts, scn) {
   nouvelleCloison.parent = groupe;
 
   const boisMat = new BABYLON.StandardMaterial("fenetre", scn);
-
+  const wallEpaisseur = optionsCloison.epaisseur || 0.1;
 
   for (let i = 0; i < trous.length; i++) {
     let trouOpts = trous[i];
     if (trouOpts.fenetre) {
-      // 1. Marco: Usa la textura pasada en opts, o 240.jpg por defecto
       let texturaMarco = trouOpts.materiau || "./assets/240.jpg";
       boisMat.diffuseTexture = new BABYLON.Texture(texturaMarco, scn);
       boisMat.specularColor = new BABYLON.Color3(0.1, 0.1, 0.1);
 
-      // 2. Vidrio: Material estándar translúcido, sin depender de HDR
       var glassMat = new BABYLON.StandardMaterial("glass", scn);
-      glassMat.diffuseColor = new BABYLON.Color3(0.6, 0.8, 1.0); // Tono celeste
-      glassMat.alpha = 0.4; // Transparencia
+      glassMat.diffuseColor = new BABYLON.Color3(0.6, 0.8, 1.0);
+      glassMat.alpha = 0.4;
       glassMat.backFaceCulling = false;
 
-      let frameOpts = trouOpts;
-      frameOpts.materiau = boisMat;
+      let frameOpts = {
+        largeur:   trouOpts.largeur,
+        hauteur:   trouOpts.hauteur,
+        epaisseur: wallEpaisseur,
+        position:  trouOpts.position,
+        materiau:  boisMat
+      };
       let frameGroupe = creerCloison(`trou_frame_${nom}_${i}`, frameOpts, scn);
       frameGroupe.parent = nouvelleCloison;
       let pos = frameOpts.position || new BABYLON.Vector3(0, frameOpts.hauteur / 2.0, 0);
@@ -374,12 +377,13 @@ function creerCloisonAvecTrous(nom, opts, scn) {
       let frame = frameGroupe.getChildMeshes()[0];
       let csgFrame = BABYLON.CSG.FromMesh(frame);
 
-      let glassOpts = trouOpts;
-      glassOpts.largeur *= 0.85;
-      glassOpts.hauteur *= 0.85;
-      glassOpts.position = new BABYLON.Vector3(0, 0, 0);
-      glassOpts.position.y += (- (frameOpts.hauteur / 2));
-      glassOpts.materiau = glassMat; // Asignamos el nuevo material de vidrio
+      let glassOpts = {
+        largeur:   trouOpts.largeur * 0.85,
+        hauteur:   trouOpts.hauteur * 0.85,
+        epaisseur: wallEpaisseur + 0.05,
+        position:  new BABYLON.Vector3(0, -(trouOpts.hauteur / 2), 0),
+        materiau:  glassMat
+      };
 
       let glassGroupe = creerCloison(`trou_glass_${nom}_${i}`, glassOpts, scn);
       glassGroupe.position = frame.position.add(glassOpts.position);
