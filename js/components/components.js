@@ -11,10 +11,12 @@ import {Rotation}       from  './rotation.js' ;
 import {AnchoredTo}     from  './anchoredTo.js' ; 
 import {LookAtPoint}    from  './lookAtPoint.js' ;
 import {LookAtCamera}   from './lookAtCamera.js' ; 
-import {BrownianMotion} from './brownianMotion.js' ;  
+import {BrownianMotion} from './brownianMotion.js' ;
+import {Model}          from './model.js' ;
 
 const COMPS = {
     box            : Box,
+    model          : Model,
     sphere         : Sphere,
     wall           : Wall,
     sky            : Sky,

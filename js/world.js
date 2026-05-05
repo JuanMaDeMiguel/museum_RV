@@ -186,16 +186,10 @@ class World extends Simu {
     mur7.position = new BABYLON.Vector3(10 + offsetX, 0, 22.5 + offsetZ)
     mur7.rotation.y = Math.PI / 2;
 
-    const statue = PRIMS.model("statue", { echelle: 0.005, fichier: "./assets/la_valse.glb" }, scene);
-
-    const matVerreBleu = new BABYLON.StandardMaterial("verre_bleu", scene);
-    matVerreBleu.diffuseColor = new BABYLON.Color3(0.6, 0.8, 1.0);
-    matVerreBleu.alpha = 0.4;
-
-    this.createEntity("cubo_rotatorio", ENTITIES.entity, {})
-      .add(COMPS.box, { name: "mesh_cubo", width: 2, height: 2, depth: 2 })
-      .add(COMPS.position, { x: 5, y: 1, z: 5 })
-      .add(COMPS.rotation, { alpha: 0.05 }); // alpha es la velocidad de giro
+    this.createEntity("estatua_valse", ENTITIES.entity, {})
+      .add(COMPS.model, { name: "la_valse", fichier: "./assets/la_valse.glb", echelle: 0.005 })
+      .add(COMPS.position, { x: 22, y: 0, z: 22 })
+      .add(COMPS.rotation, { alpha: 0.003 });
   }
 }
 

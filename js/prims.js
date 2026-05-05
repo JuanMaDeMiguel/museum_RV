@@ -18,7 +18,7 @@ function creerCamera(name, options, scn) {
 
   camera.minZ = 0.05;
 
-  camera.checkCollisions = false;
+  camera.checkCollisions = true;
   camera.ellipsoid = new BABYLON.Vector3(0.5, 1.0, 0.5);
   camera.applyGravity = true;
   camera.keysLeft = [65, 37];  // A y Flecha Izquierda
