@@ -178,19 +178,23 @@ function creerPoster(nom, opts, scn) {
   let largeur = options["largeur"] || 1.0;
   let textureName = options["tableau"] || "";
 
-  var group = new BABYLON.TransformNode("group-" + nom)
+  var group = new BABYLON.TransformNode("group-" + nom, scn)
   var tableau1 = BABYLON.MeshBuilder.CreatePlane("tableau-" + nom, { width: largeur, height: hauteur }, scn);
   var verso = BABYLON.MeshBuilder.CreatePlane("verso-" + nom, { width: largeur, height: hauteur }, scn);
   tableau1.parent = group;
+  tableau1.position.z = 0.01;
   verso.position.z = -0.01;
   verso.parent = group;
   tableau1.rotation.y = Math.PI;
 
   var mat = new BABYLON.StandardMaterial("tex-tableau-" + nom, scn);
   mat.diffuseTexture = new BABYLON.Texture(textureName, scn);
+  mat.backFaceCulling = false;
   tableau1.material = mat;
+  verso.material = mat;
 
   tableau1.checkCollisions = true;
+  verso.checkCollisions = true;
 
   return group;
 

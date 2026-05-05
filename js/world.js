@@ -190,6 +190,69 @@ class World extends Simu {
       .add(COMPS.model, { name: "la_valse", fichier: "./assets/la_valse.glb", echelle: 0.05 })
       .add(COMPS.position, { x: 30, y: 0, z: 20 })
       .add(COMPS.rotation, { alpha: 0.003 });
+
+    // ==========================================
+    // 6. CUADROS
+    // ==========================================
+    // Coordenadas LOCALES a cada pared (como en el ejemplo del profesor).
+    // lz: offset perpendicular a la pared (+0.1 = hacia adentro del cuarto cuando
+    //     local +Z apunta al interior, -0.1 cuando apunta al exterior).
+    // ry: rotation.y del poster en el frame local de la pared.
+    //     PI  → imagen mira hacia local +Z de la pared
+    //     0   → imagen mira hacia local -Z de la pared
+    //
+    // Conversión local X ↔ mundo:
+    //   mur1  (rot=0,   centro X=30): lx = worldX - 30
+    //   mur2  (rot=3π/2,centro Z=30): lx = 30 - worldZ   (local +X → mundo -Z)
+    //   mur3  (rot=π/2, centro Z=30): lx = worldZ - 30
+    //   mur6  (rot=π/2, centro Z=37.5): lx = worldZ - 37.5
+    //   mur7  (rot=π/2, centro Z=37.5): lx = worldZ - 37.5
+    //
+    // Ventana en mur2 en mundo Z≈37.5 → cuadro en Z=33 (lx=-3) la evita.
+
+    const cuadros = [
+      // --- Habitación 1 (izq, X=15-25, Z=30-45) ---
+      // Fondo (mur1): lx = worldX - 30
+      { wall: mur1,       lx: -11,  ly: 1.7, lz: -0.1, ry: 0,       image: "./assets/gioconde.jpg"      },
+      { wall: mur1,       lx:  -8,  ly: 1.7, lz: -0.1, ry: 0,       image: "./assets/creacion_adan.jpg" },
+      // Pared izq exterior (mur2): worldZ=33 → lx=30-33=-3, lejos de la ventana en Z=37.5
+      { wall: mur2_final, lx:  -3,  ly: 1.7, lz:  0.1, ry: Math.PI, image: "./assets/sanmartin.jpg"     },
+      // Pared der interna (mur7, lado hab.1): worldZ=38 → lx=0.5, lz=+0.1 apunta a hab.1
+      { wall: mur7,       lx:  0.5, ly: 1.7, lz:  0.1, ry: Math.PI, image: "./assets/napoleon.jpg"      },
+
+      // --- Habitación 2 (centro, X=25-35, Z=30-45) ---
+      // Fondo (mur1)
+      { wall: mur1,       lx:  -2,  ly: 1.7, lz: -0.1, ry: 0,       image: "./assets/starred_night.jpg" },
+      { wall: mur1,       lx:   2,  ly: 1.7, lz: -0.1, ry: 0,       image: "./assets/diego.jpg"         },
+      // Pared izq interna (mur7, lado hab.2): lz=-0.1 apunta hacia hab.2
+      { wall: mur7,       lx:  0.5, ly: 1.7, lz: -0.1, ry: 0,       image: "./assets/ramses.jpg"        },
+      // Pared der interna (mur6, lado hab.2): lz=+0.1 apunta hacia hab.2
+      { wall: mur6,       lx:  0.5, ly: 1.7, lz:  0.1, ry: Math.PI, image: "./assets/caruso.jpeg"       },
+
+      // --- Habitación 3 (der, X=35-45, Z=30-45) ---
+      // Fondo (mur1)
+      { wall: mur1,       lx:   8,  ly: 1.7, lz: -0.1, ry: 0,       image: "./assets/4.jpg"             },
+      { wall: mur1,       lx:  12,  ly: 1.7, lz: -0.1, ry: 0,       image: "./assets/edd.jpg"           },
+      // Pared izq interna (mur6, lado hab.3): lz=-0.1 apunta hacia hab.3
+      { wall: mur6,       lx:  0.5, ly: 1.7, lz: -0.1, ry: 0,       image: "./assets/habbo.png"         },
+
+      // --- Planta alta (Y=7.5) ---
+      // Fondo (mur1)
+      { wall: mur1,       lx:  -5,  ly: 7.5, lz: -0.1, ry: 0,       image: "./assets/kike.png"          },
+      { wall: mur1,       lx:   5,  ly: 7.5, lz: -0.1, ry: 0,       image: "./assets/rich.jpeg"         },
+      // Pared der exterior (mur3): worldZ=36 → lx=6, sin ventanas en Z=30-45
+      { wall: mur3_final, lx:   6,  ly: 7.5, lz:  0.1, ry: Math.PI, image: "./assets/tinelli.jpeg"      },
+    ];
+
+    for (const c of cuadros) {
+      const cuadro = PRIMS.poster(c.image, { largeur: 2.5, hauteur: 2.0, tableau: c.image }, scene);
+      cuadro.parent = c.wall;
+      cuadro.position.x = c.lx;
+      cuadro.position.y = c.ly;
+      cuadro.position.z = c.lz;
+      cuadro.rotation.y = c.ry;
+      cuadro.checkCollisions = false;
+    }
   }
 }
 
