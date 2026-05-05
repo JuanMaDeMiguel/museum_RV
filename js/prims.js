@@ -366,7 +366,7 @@ function creerCloisonAvecTrous(nom, opts, scn) {
       let frameOpts = {
         largeur:   trouOpts.largeur,
         hauteur:   trouOpts.hauteur,
-        epaisseur: wallEpaisseur,
+        epaisseur: wallEpaisseur + 0.3,
         position:  trouOpts.position,
         materiau:  boisMat
       };
@@ -377,11 +377,12 @@ function creerCloisonAvecTrous(nom, opts, scn) {
       let frame = frameGroupe.getChildMeshes()[0];
       let csgFrame = BABYLON.CSG.FromMesh(frame);
 
+      const glassHauteur = trouOpts.hauteur * 0.85;
       let glassOpts = {
         largeur:   trouOpts.largeur * 0.85,
-        hauteur:   trouOpts.hauteur * 0.85,
-        epaisseur: wallEpaisseur + 0.05,
-        position:  new BABYLON.Vector3(0, -(trouOpts.hauteur / 2), 0),
+        hauteur:   glassHauteur,
+        epaisseur: wallEpaisseur + 0.35,
+        position:  new BABYLON.Vector3(0, -(glassHauteur / 2), 0),
         materiau:  glassMat
       };
 
@@ -501,7 +502,9 @@ function creerModel3D(nom, opts, scn) {
     scn,
     function (meshes) {
       meshes.forEach(mesh => {
-        mesh.parent = container;
+        if (!mesh.parent) {
+          mesh.parent = container;
+        }
       });
       container.scaling = new BABYLON.Vector3(scaling, scaling, scaling);
     },

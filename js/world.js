@@ -187,7 +187,7 @@ class World extends Simu {
     mur7.rotation.y = Math.PI / 2;
 
     this.createEntity("estatua_valse", ENTITIES.entity, {})
-      .add(COMPS.model, { name: "la_valse", fichier: "./assets/la_valse.glb", echelle: 0.005 })
+      .add(COMPS.model, { name: "la_valse", fichier: "./assets/la_valse.glb", echelle: 0.05 })
       .add(COMPS.position, { x: 30, y: 0, z: 20 })
       .add(COMPS.rotation, { alpha: 0.003 });
   }
