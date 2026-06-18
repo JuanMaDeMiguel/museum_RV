@@ -82,14 +82,18 @@ class Newton extends Entity {
 
   update(dt) {
 
-    //console.log("=> ", this.name, " : ", this.force) ; 
-    //console.log("Acteur : ", this.sim.clock);
-    this.velocity.scaleAndAddToRef(dt, this.position);
     this.force.scaleAndAddToRef(dt / this.mass, this.velocity);
     this.force.set(0, 0, 0);
 
-    if (this.object3d) {
-      this.object3d.position.copyFrom(this.position);
+    if (this.object3d && this.object3d.moveWithCollisions) {
+      // Mesh with a collider (e.g. visitors): slide along walls like the camera does.
+      this.object3d.moveWithCollisions(this.velocity.scale(dt));
+      this.position.copyFrom(this.object3d.position);
+    } else {
+      this.velocity.scaleAndAddToRef(dt, this.position);
+      if (this.object3d) {
+        this.object3d.position.copyFrom(this.position);
+      }
     }
 
   }

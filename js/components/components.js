@@ -13,10 +13,17 @@ import {LookAtPoint}    from  './lookAtPoint.js' ;
 import {LookAtCamera}   from './lookAtCamera.js' ; 
 import {BrownianMotion} from './brownianMotion.js' ;
 import {Model}          from './model.js' ;
+import {Person}         from './person.js' ;
+import {Seek}           from './seek.js' ;
+import {Arrive}          from './arrive.js' ;
+import {Trajectory}      from './trajectory.js' ;
+import {LookAtForward}   from './lookAtForward.js' ;
+import {BehaviorTree}    from './behaviorTree.js' ;
 
 const COMPS = {
     box            : Box,
     model          : Model,
+    person         : Person,
     sphere         : Sphere,
     wall           : Wall,
     sky            : Sky,
@@ -28,6 +35,11 @@ const COMPS = {
     lookAtPoint    : LookAtPoint,
     lookAtCamera   : LookAtCamera,
     brownianMotion : BrownianMotion,
+    seek           : Seek,
+    arrive         : Arrive,
+    trajectory     : Trajectory,
+    lookAtForward  : LookAtForward,
+    behaviorTree   : BehaviorTree,
     component      : Component
 }
 

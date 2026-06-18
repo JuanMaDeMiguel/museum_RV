@@ -3,6 +3,7 @@ import { Simu } from './simu.js';
 
 import { ENTITIES } from './entities/entities.js';
 import { COMPS } from './components/components.js';
+import { buildVisitorBT } from './bt/visitorBT.js';
 
 class World extends Simu {
 
@@ -29,8 +30,16 @@ class World extends Simu {
     const light2 = new BABYLON.HemisphericLight("l0", new BABYLON.Vector3(1, -1, 0), scene);
     light2.intensity = 0.2;
 
-    const materiau1 = PRIMS.standardMaterial("mat1", { texture: "./assets/240.jpg" }, scene);
+    const materiau1 = PRIMS.standardMaterial("mat1", { couleur: [0.18, 0.18, 0.2] }, scene);
     const materiau2 = PRIMS.standardMaterial("mat_sol", { texture: "./assets/marble.jpg", uScale: 25, vScale: 25 }, scene);
+    // Variantes de pared (gris oscuro, sin textura de madera) para que las salas no sean todas iguales.
+    const materiauFondo   = PRIMS.standardMaterial("mat_fondo",   { couleur: [0.16, 0.16, 0.18] }, scene);
+    const materiauLateral = PRIMS.standardMaterial("mat_lateral", { couleur: [0.22, 0.22, 0.25] }, scene);
+    // Piso interior del museo (distinto del piso/plataforma exterior a cuadros).
+    const materiauPiso = PRIMS.standardMaterial("mat_piso", { texture: "./assets/240.jpg", uScale: 6, vScale: 6, couleur: [0.45, 0.3, 0.2] }, scene);
+    // Alfombras (color liso, sin textura específica disponible en assets).
+    const materiauAlfombra = new BABYLON.StandardMaterial("mat_alfombra", scene);
+    materiauAlfombra.diffuseColor = new BABYLON.Color3(0.45, 0.05, 0.08);
 
     const ciel = PRIMS.sky("ciel", {}, scene);
     const sol = PRIMS.ground("sol", { materiau: materiau2 }, scene);
@@ -47,7 +56,7 @@ class World extends Simu {
     // ==========================================
     // 1. PARED DEL FONDO
     // ==========================================
-    const mur1 = PRIMS.wall("wall-1", { materiau: materiau1, largeur: 30, hauteur: 10 }, scene);
+    const mur1 = PRIMS.wall("wall-1", { materiau: materiauFondo, largeur: 30, hauteur: 10 }, scene);
     mur1.position = new BABYLON.Vector3(15 + offsetX, 0, 30 + offsetZ);
 
 
@@ -56,7 +65,7 @@ class World extends Simu {
     // ==========================================
     // Pared Izquierda (mur2)
     const opcionesParedIzq = {
-      cloison: { largeur: 30, hauteur: 10, materiau: materiau1, epaisseur: 0.5 },
+      cloison: { largeur: 30, hauteur: 10, materiau: materiauLateral, epaisseur: 0.5 },
       trous: [
         { largeur: 8, hauteur: 6, epaisseur: 2, fenetre: true, position: new BABYLON.Vector3(-7.5, -4, 0) },
         { largeur: 8, hauteur: 3, epaisseur: 2, fenetre: true, position: new BABYLON.Vector3(7.5, -4, 0) }
@@ -68,7 +77,7 @@ class World extends Simu {
 
     // Pared Derecha (mur3)
     const opcionesParedDer = {
-      cloison: { largeur: 30, hauteur: 10, materiau: materiau1, epaisseur: 0.5 },
+      cloison: { largeur: 30, hauteur: 10, materiau: materiauLateral, epaisseur: 0.5 },
       trous: [
         { largeur: 8, hauteur: 3, epaisseur: 2, fenetre: true, position: new BABYLON.Vector3(-7.5, -4, 0) }
       ]
@@ -186,9 +195,31 @@ class World extends Simu {
     mur7.position = new BABYLON.Vector3(10 + offsetX, 0, 22.5 + offsetZ)
     mur7.rotation.y = Math.PI / 2;
 
+    // ==========================================
+    // 5bis. PISO INTERIOR Y ALFOMBRAS
+    // ==========================================
+    // Piso propio del museo (distinto del piso/plataforma exterior), apenas
+    // elevado para no pelearse con el suelo de afuera (z-fighting).
+    const pisoMuseo = BABYLON.MeshBuilder.CreateGround("piso-museo", { width: 30, height: 30 }, scene);
+    pisoMuseo.material = materiauPiso;
+    pisoMuseo.position = new BABYLON.Vector3(15 + offsetX, 0.02, 15 + offsetZ);
+
+    const alfombras = [
+      { x: 15 + offsetX, z: 7.5 + offsetZ, width: 10, height: 4 },  // hall, frente a la puerta principal
+      { x: 5 + offsetX,  z: 22.5 + offsetZ, width: 6,  height: 9 }, // sala 1
+      { x: 15 + offsetX, z: 22.5 + offsetZ, width: 6,  height: 9 }, // sala 2 (sala principal)
+      { x: 25 + offsetX, z: 22.5 + offsetZ, width: 6,  height: 9 }, // sala 3
+    ];
+    for (const a of alfombras) {
+      const alfombra = BABYLON.MeshBuilder.CreateGround("alfombra-" + a.x + "-" + a.z, { width: a.width, height: a.height }, scene);
+      alfombra.material = materiauAlfombra;
+      alfombra.position = new BABYLON.Vector3(a.x, 0.04, a.z);
+      alfombra.checkCollisions = false;
+    }
+
     this.createEntity("estatua_valse", ENTITIES.entity, {})
-      .add(COMPS.model, { name: "la_valse", fichier: "./assets/la_valse.glb", echelle: 0.05 })
-      .add(COMPS.position, { x: 30, y: 0, z: 20 })
+      .add(COMPS.model, { name: "la_valse", fichier: "./assets/la_valse.glb", echelle: 0.006 })
+      .add(COMPS.position, { x: 30, y: 0, z: 37 })
       .add(COMPS.rotation, { alpha: 0.003 });
 
     // ==========================================
@@ -253,6 +284,51 @@ class World extends Simu {
       cuadro.rotation.y = c.ry;
       cuadro.checkCollisions = false;
     }
+
+    // ==========================================
+    // 7. VISITANTES (Newton + Behavior Tree + Steering)
+    // ==========================================
+    // Geometría real del edificio (coordenadas absolutas de mundo, ver mur4_final,
+    // mur6, mur7, pInt1-3 más arriba):
+    //   - Hall de entrada: X 15-45, Z 15-30 (entre fachada en Z=15 y mur4 en Z=30)
+    //   - 3 puertas correderas en mur4 (Z≈30), centradas en X=20, X=30 y X=40
+    //   - 3 salas detrás de mur4: X 15-25 / 25-35 / 35-45, todas Z 30-45
+    // El recorrido siempre cruza la puerta en línea recta (misma X en el punto
+    // del hall y en el punto de la sala) y nunca vuelve a una sala sin pasar
+    // primero por el hall.
+    const hall = { x: 30, y: 0, z: 22 };  // centro del hall de entrada
+
+    function tramoSala(xPuerta, xRincon1, xRincon2) {
+      const antesPuerta = { x: xPuerta, y: 0, z: 27 };  // lado del hall, frente a la puerta
+      const dentroSala  = { x: xPuerta, y: 0, z: 33 };  // ya cruzó, lado de la sala
+      const rincon1     = { x: xRincon1, y: 0, z: 35 };
+      const rincon2     = { x: xRincon2, y: 0, z: 42 };
+      return [hall, antesPuerta, dentroSala, rincon1, rincon2, dentroSala, antesPuerta];
+    }
+
+    const recorrido = [
+      hall,
+      ...tramoSala(20, 18, 22),  // sala 1 (X 15-25)
+      hall,
+      ...tramoSala(30, 28, 32),  // sala 2 (X 25-35)
+      hall,
+      ...tramoSala(40, 38, 42),  // sala 3 (X 35-45)
+    ];
+
+    const visitantes = [
+      { nombre: "visitante_1", startIndex: 0,                      reverse: false, clothColor: [0.65, 0.15, 0.15] },
+      { nombre: "visitante_2", startIndex: Math.floor(recorrido.length / 2), reverse: true,  clothColor: [0.15, 0.45, 0.25] },
+    ];
+
+    visitantes.forEach(({ nombre, startIndex, reverse, clothColor }) => {
+      this.createEntity(nombre, ENTITIES.newton, { mass: 1.0 })
+        .add(COMPS.person, { hauteur: 0.5, largeur: 0.4, epaisseur: 0.3, clothColor })
+        .add(COMPS.position, recorrido[startIndex])
+        .add(COMPS.trajectory, { waypoints: recorrido, pauseTime: 1.5, loop: true, startIndex, reverse })
+        .add(COMPS.arrive, { vMax: 1.2, slowRadius: 2.0 })
+        .add(COMPS.lookAtForward, {})
+        .add(COMPS.behaviorTree, { root: buildVisitorBT() });
+    });
   }
 }
 
