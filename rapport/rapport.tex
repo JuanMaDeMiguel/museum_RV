@@ -1,0 +1,403 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[a4paper,margin=2.4cm]{geometry}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{caption}
+
+% Localisation française manuelle (babel-french indisponible sur cette installation).
+\renewcommand{\contentsname}{Table des matières}
+\renewcommand{\figurename}{Figure}
+\renewcommand{\tablename}{Table}
+\frenchspacing
+
+% --- Liens et index : tout en NOIR (hidelinks) ---
+\usepackage[hidelinks]{hyperref}
+\hypersetup{
+  pdftitle={Musee virtuel en Babylon.js -- Rapport de projet ReV},
+  pdfauthor={Juan Marcos De Miguel Funes et Julian Rayes},
+  colorlinks=false
+}
+
+\captionsetup{font=small,labelfont=it,textfont=it}
+
+% --- Style des extraits de code ---
+\definecolor{codegray}{gray}{0.95}
+\definecolor{codecomment}{rgb}{0.40,0.45,0.40}
+\definecolor{codekw}{rgb}{0.15,0.15,0.55}
+\definecolor{codestr}{rgb}{0.55,0.20,0.10}
+\lstset{
+  basicstyle=\ttfamily\footnotesize,
+  backgroundcolor=\color{codegray},
+  commentstyle=\color{codecomment}\itshape,
+  keywordstyle=\color{codekw}\bfseries,
+  stringstyle=\color{codestr},
+  numberstyle=\tiny\color{gray},
+  numbers=left, numbersep=7pt,
+  frame=single, rulecolor=\color{gray!40},
+  breaklines=true, showstringspaces=false, tabsize=2, captionpos=b,
+  language=Java,
+  morekeywords={let,const,var,function,class,extends,return,new,this,import,export,from,null,true,false,of,forEach}
+}
+
+% --- Emplacement réservé pour une figure (capture à insérer) ---
+\newcommand{\figslot}[2][0.70\linewidth]{%
+  \begin{figure}[ht]\centering
+  \setlength{\fboxsep}{0pt}%
+  \fcolorbox{gray!50}{gray!8}{%
+    \begin{minipage}[c][3.8cm][c]{#1}\centering\itshape\small
+      [\,Emplacement figure --- capture d'écran à insérer\,]
+    \end{minipage}}%
+  \caption{#2}
+  \end{figure}}
+
+\setlength{\parskip}{0.45em}
+\setlength{\parindent}{0pt}
+\setlength{\emergencystretch}{3em}
+
+\begin{document}
+
+% ============================ PAGE DE TITRE ============================
+\begin{titlepage}
+\centering
+\vspace*{1.5cm}
+{\Large\bfseries École Nationale d'Ingénieurs de Brest\par}
+\vspace{0.3cm}
+{\large Module ReV --- Réalité Virtuelle\par}
+\vspace{2.5cm}
+\rule{\linewidth}{0.5pt}\\[0.5cm]
+{\huge\bfseries Conception d'un musée virtuel\\[0.3cm] en Babylon.js\par}
+\vspace{0.4cm}
+{\large\itshape Modélisation, animation et simulation de foule\par}
+\rule{\linewidth}{0.5pt}\\[2.5cm]
+
+{\large
+\textbf{Juan Marcos De Miguel Funes}\\[0.2cm]
+\textbf{Julian Rayes}\par}
+\vspace{2.5cm}
+{\large Encadrant : Éric Maisel\par}
+\vfill
+{\large Brest --- Juin 2026\par}
+\end{titlepage}
+
+% ============================ TABLE DES MATIERES ============================
+\clearpage
+\tableofcontents
+\clearpage
+
+% ============================ 1. INTRODUCTION ============================
+\section{Introduction}
+
+Ce rapport décrit la conception d'une \emph{visite de musée virtuel} réalisée
+avec le moteur 3D temps réel \textbf{Babylon.js}, dans le cadre du module ReV.
+Le bâtiment occupe une emprise de $30\times30$~m~: un hall vitré de $15\times30$~m
+et de $10$~m de haut au sud, et au nord trois salles fermées par des portes
+coulissantes, surmontées d'une mezzanine accessible par un escalier. Les salles
+exposent des tableaux~; le hall et la mezzanine accueillent des statues et un
+mobile articulé.
+
+Le projet a été développé en groupe et étalé sur plusieurs séances. Une première
+base a été posée --- squelette de l'application (couches \texttt{Visu}/\texttt{Simu}),
+système entités/composants, premières primitives, bâtiment initial et tableaux ---
+puis progressivement étendue~: portes automatiques, sculptures, décor extérieur,
+garde-corps, et enfin une simulation de visiteurs autonomes et de foule guidée. La
+collection d'oeuvres est volontairement \emph{éclectique}, mêlant chefs-d'oeuvre
+classiques (la Joconde, la Création d'Adam, la Nuit étoilée) et images plus
+personnelles~; elle sert de support aux fonctionnalités techniques qui font le
+coeur du projet.
+
+L'application utilise les modules ES~; elle se lance en servant le dossier en HTTP
+(\texttt{python3 -m http.server}) puis en ouvrant \texttt{index.html}, qui charge
+Babylon, instancie la classe \texttt{World} et démarre la boucle de rendu.
+
+\figslot{Vue d'ensemble du musée depuis l'extérieur~: hall vitré, parvis et ciel.}
+
+% ============================ 2. ARCHITECTURE ============================
+\section{Architecture logicielle}
+
+Le projet repose sur une architecture \textbf{entités--composants (ECS)} inspirée
+du cours \emph{Simuler pour animer}. Une \texttt{Entity}
+(\texttt{js/entities/entities.js}) est un conteneur --- nom, position,
+\texttt{object3d}, liste de composants --- doté d'une API chaînable
+(\texttt{createEntity(...).add(...)}). Deux spécialisations gèrent le mouvement~:
+\texttt{Kine} (cinématique) et \texttt{Newton} (forces $\rightarrow$ accélération
+$\rightarrow$ vitesse $\rightarrow$ position, par intégration d'Euler).
+
+Le point clé est la \textbf{double passe} de \texttt{Simu.update(dt)}~: chaque
+image, on \emph{décide} d'abord (tous les composants calculent leurs forces et
+font évoluer les arbres de comportement), puis on \emph{intègre} (le mouvement
+résultant est appliqué). Un composant d'IA ne touche donc jamais l'état physique
+en cours de calcul.
+
+\begin{lstlisting}[caption={Double passe décision / intégration (js/simu.js).},label=lst:simu]
+update(dt) {
+  this.entities.forEach((e) => { if (e.execute) e.execute(dt); }); // 1. decision
+  this.entities.forEach((e) => { if (e.update)  e.update(dt);  }); // 2. integration
+}
+\end{lstlisting}
+
+Les composants ne se connaissent pas entre eux~: ils communiquent par un
+\emph{blackboard} (\texttt{entity.blackboard}). La trajectoire y écrit le point
+visé, le steering le lit, l'arbre de comportement y stocke l'état de pause, le
+guide y publie le tableau présenté. Ce découplage a permis d'empiler de nouveaux
+comportements sans réécrire l'existant.
+
+% ============================ 3. MODELISATION ============================
+\section{Modélisation et matériaux}
+
+\subsection{Structure, ouvertures et collisions}
+
+Les cloisons sont produites par \texttt{js/prims.js}. Les ouvertures (portes,
+baies) sont creusées par \textbf{opérations CSG}~: la fonction \texttt{creuser}
+soustrait au mur un volume-outil (\texttt{BABYLON.CSG.subtract}). Le mur intérieur
+qui sépare le hall des salles est ainsi percé de trois portes, et les baies
+vitrées reçoivent un cadre et une vitre semi-transparente. La caméra est une
+\texttt{UniversalCamera} en vue première personne, avec capsule de collision,
+gravité et déplacements QWERTY~; tous les éléments structurels sont collisionnables.
+
+\figslot{Hall vu de l'intérieur~: baies vitrées et mur à trois portes coulissantes.}
+
+\subsection{Escalier, garde-corps et habillage}
+
+L'escalier (20 marches) double chaque marche~: une \emph{planche visible} fine et
+un \emph{bloc de collision invisible} dont la hauteur croît avec l'indice. C'est
+ce bloc qui est collisionnable, ce qui évite à la caméra de rester bloquée ou de
+sauter de marche en marche --- problème classique des escaliers. Le bord ouvert
+de la mezzanine est protégé par un \textbf{garde-corps en verre} collisionnable,
+interrompu là où débouche l'escalier pour laisser le passage.
+
+Côté matériaux, le musée combine teintes unies (murs gris à deux variantes,
+tapis, piédestaux) et textures (sol intérieur, skybox). Le parvis extérieur est
+une \emph{pelouse procédurale}~: une \texttt{DynamicTexture} $16\times16$ remplie
+au hasard d'une palette de verts et échantillonnée en mode \texttt{NEAREST}
+(rendu « bloc » façon Minecraft), sans aucune dépendance à un fichier image.
+
+% ============================ 4. TABLEAUX ET SCULPTURES ============================
+\section{Tableaux et sculptures}
+
+\subsection{Tableaux}
+
+Chaque tableau est un \emph{poster} double-face (deux plans dos à dos partageant
+la même texture). Il est \emph{accroché} en devenant \texttt{parent} du mur cible,
+puis positionné en \textbf{coordonnées locales}~: un décalage perpendiculaire le
+décolle du mur et choisit la face exposée, une rotation l'oriente vers
+l'intérieur. Les positions évitent les baies vitrées. Une quinzaine de tableaux
+sont répartis dans les salles et sur la mezzanine.
+
+\figslot{Une salle d'exposition~: tableaux accrochés aux murs.}
+
+\subsection{Statues importées et mobiles animés}
+
+Le musée présente trois familles de sculptures.
+
+\textbf{Statue tournante.} La sculpture \emph{La Valse} (\texttt{.glb}) est
+importée via \texttt{ImportMesh} et tourne lentement sur un piédestal. La fonction
+d'import dispose d'une option \texttt{poserAuSol} qui, après mise à l'échelle,
+calcule la boîte englobante pour poser la base au sol et centrer l'empreinte du
+modèle sur son axe --- sans quoi elle traversait le sol et tournait de travers.
+
+\figslot{La statue \emph{La Valse}, importée et tournant sur son piédestal.}
+
+\textbf{Maillages statiques.} Trois animaux low-poly (chat, cheval, loup) ornent
+le hall d'entrée, alignés face à la porte et rendus collisionnables (obstacles).
+Leur orientation est fixée dans le \emph{callback} \texttt{onCharge}, exécuté
+\emph{après} le centrage automatique --- la fixer avant aurait décentré le modèle.
+
+\figslot{Les animaux low-poly importés dans le hall, faisant face à l'entrée.}
+
+\textbf{Mobile articulé (Calder).} Au-dessus de la mezzanine pend un mobile
+entièrement géométrique, construit \emph{récursivement}~: chaque niveau est une
+tige pivotant sur un axe vertical, portant un disque coloré d'un côté et le niveau
+inférieur (suspendu par un fil) de l'autre. Le composant \texttt{Mobile} fait
+tourner chaque tige à sa propre vitesse, en sens opposé d'un niveau à l'autre~;
+le mouvement est donc \emph{articulé} (les parties bougent les unes par rapport aux
+autres), contrairement à la rotation d'un bloc rigide de \emph{La Valse}.
+
+\figslot{Le mobile articulé (style Calder) suspendu au-dessus de la mezzanine.}
+
+% ============================ 5. PORTES ============================
+\section{Portes coulissantes automatiques}
+
+Les quatre portes (entrée principale et trois portes internes) s'ouvrent à
+l'approche d'un agent et se referment à son éloignement, en suivant la directive
+du cours (« regarder régulièrement »)~: la proximité est évaluée à \emph{chaque
+pas}, pas par un raycast ponctuel. Chaque battant mémorise sa position fermée et
+ouverte~; le composant \texttt{AutoDoor} mesure la distance de l'agent le plus
+proche (caméra ou visiteur) et interpole en douceur les battants.
+
+\begin{lstlisting}[caption={Ouverture par proximité (js/components/autoDoor.js).},label=lst:autodoor]
+execute(dt){
+  const open = this.nearestAgentDistance() < this.radius;
+  for (const p of this.panels) {
+    const targetX = open ? p.openX : p.closedX;
+    p.mesh.position.x += (targetX - p.mesh.position.x) * this.speed; // lissage
+  }
+}
+\end{lstlisting}
+
+Le dimensionnement des battants a demandé quelques itérations~: fermés, les
+battants laissaient voir l'intérieur par les jointures. La version finale les
+surdimensionne uniquement vers leurs bords \emph{exposés} (extérieur et haut), en
+laissant le bord intérieur (là où les deux battants se rejoignent) au centre exact,
+sans quoi ils se chevauchaient.
+
+\figslot{Une porte coulissante s'ouvrant à l'approche d'un visiteur.}
+
+% ============================ 6. VISITEURS IA ============================
+\section{Visiteurs autonomes : steering et arbres de comportement}
+\label{sec:visiteurs}
+
+Le coeur dynamique du musée est une population de visiteurs autonomes~: ils
+marchent dans une salle, franchissent une porte, s'arrêtent devant une oeuvre,
+puis repartent en boucle. Chaque visiteur combine trois mécanismes indépendants
+reliés par le blackboard.
+
+\subsection{Steering et trajectoire}
+
+\texttt{Seek} et \texttt{Arrive} (d'après Reynolds, 1987) appliquent une force de
+pilotage $\vec{F_s}=k(\vec{v_d}-\vec{v_c})$ vers le point visé~; \texttt{Arrive}
+ralentit dans un rayon pour s'arrêter sans osciller, et c'est lui qu'utilisent les
+visiteurs. \texttt{Trajectory} enchaîne des points de passage (avec bouclage,
+point de départ et sens réglables, pour désynchroniser plusieurs visiteurs sur le
+même circuit). Ces points sont calculés à partir des coordonnées réelles des murs
+et des portes, pour que chaque segment traverse bien une ouverture. Enfin, comme
+la caméra, chaque visiteur possède un \textbf{collider invisible} déplacé par
+\texttt{moveWithCollisions}~; le corps visible (peau, vêtements, cheveux, yeux)
+en est l'enfant, et Babylon le fait glisser le long des murs.
+
+\subsection{Arbre de comportement}
+
+Le module \texttt{js/bt/} fournit les primitives classiques~: \texttt{Selector}
+(« OU »), \texttt{Sequence} (« ET »), décorateurs, \texttt{Condition} et
+\texttt{Action}, renvoyant chacune un \texttt{Status} (\texttt{SUCCESS},
+\texttt{FAILURE}, \texttt{RUNNING}).
+
+\begin{lstlisting}[caption={Noeuds composites Selector et Sequence (js/bt/behaviorTree.js).},label=lst:bt]
+class Selector extends Node {            // "OU" : premier non-FAILURE
+  tick(entity, dt) {
+    for (const child of this.children) {
+      const s = child.tick(entity, dt);
+      if (s !== Status.FAILURE) return s;
+    }
+    return Status.FAILURE;
+  }
+}
+class Sequence extends Node {            // "ET" : premier non-SUCCESS
+  tick(entity, dt) {
+    for (const child of this.children) {
+      const s = child.tick(entity, dt);
+      if (s !== Status.SUCCESS) return s;
+    }
+    return Status.SUCCESS;
+  }
+}
+\end{lstlisting}
+
+L'arbre du visiteur ne gouverne que les \emph{transitions d'état} (marcher
+$\leftrightarrow$ en pause)~: une branche « est en pause » décompte un minuteur
+puis avance au point suivant, une branche « est arrivé » déclenche la pause. Si
+aucune ne se déclenche, le Selector renvoie \texttt{FAILURE} --- c'est-à-dire
+« continuer à marcher », ce que le steering fait déjà seul. Choisir un arbre de
+comportement plutôt qu'une machine à états le rend \emph{composable}~: ajouter un
+état revient à ajouter une branche.
+
+\figslot{Plusieurs visiteurs parcourant le musée et s'arrêtant devant les tableaux.}
+
+% ============================ 7. FOULE ============================
+\section{Simulation de foule : guide et groupe}
+
+La dernière étape étend les visiteurs en une \emph{simulation de foule}, en
+s'appuyant sur le cours consacré aux comportements collectifs, et toujours
+par-dessus l'infrastructure ECS existante.
+
+\subsection{Règles de Reynolds}
+
+Trois composants implémentent le flocking, chacun lisant ses voisins dans un
+tableau partagé~: \texttt{Separation} (répulsion $\propto 1/d^2$),
+\texttt{Cohesion} (attraction vers le barycentre du groupe) et \texttt{Alignment}
+(alignement sur la vitesse moyenne).
+
+\begin{lstlisting}[caption={Force de séparation, répulsion en 1/d2 (js/components/separation.js).},label=lst:sep]
+execute(dt){
+  const force = new BABYLON.Vector3(0,0,0);
+  const p = this.entity.position;
+  for (const other of this.group){
+    if (other === this.entity || !other.position) continue;
+    const away = p.subtract(other.position);     // pointe a l'oppose du voisin
+    const dist = away.length();
+    if (dist > 0.0001 && dist < this.radius)
+      force.addInPlace(away.scale(1.0 / (dist * dist)));
+  }
+  this.entity.applyForce(force.scale(this.k));
+}
+\end{lstlisting}
+
+\subsection{Guide et suiveurs}
+
+Un \textbf{guide} (entité plus grande, dorée) suit sa propre trajectoire et
+s'arrête devant certains tableaux~; à l'arrêt, son arbre de comportement publie le
+tableau présenté dans le blackboard, les points sans arrêt étant simplement
+traversés pour mener le groupe d'une salle à l'autre. Quatre \textbf{suiveurs}
+visent, via \texttt{FollowGuide}, un point situé \emph{derrière} le guide (et non
+le guide lui-même, ce qui les ferait s'empiler), avec un freinage type
+\emph{Arrive}. Quand le guide présente une oeuvre, le composant \texttt{Gaze}
+tourne chaque suiveur vers le même tableau~; le guide reparti, l'orientation
+revient à la direction de marche. Les murs et le parcours du guide confinant déjà
+le groupe, aucun mécanisme de rebond n'a été nécessaire. La scène compte au final
+un guide, quatre suiveurs et six visiteurs libres (trois en bas, trois sur la
+mezzanine).
+
+\figslot{Le guide (doré) présentant un tableau~; le groupe se rassemble et tourne
+le regard vers l'oeuvre.}
+
+% ============================ 8. PROBLEMES ============================
+\section{Problèmes rencontrés et solutions}
+\label{sec:problemes}
+
+\textbf{Visiteurs qui flottaient.} Avec un groupe nombreux, les personnages se
+tassaient, se grimpaient dessus et finissaient en l'air, et bloquaient les portes
+(2~m). En cause~: leurs colliders entraient en collision \emph{entre eux}, et les
+forces de cohésion les poussaient vers le haut sans gravité pour les rabaisser. La
+solution a été de \emph{renoncer aux collisions entre visiteurs} (groupes de
+collision~: ils ignorent les autres personnes mais heurtent murs et portes) et de
+confier l'espacement à la force de séparation de Reynolds, avec deux garde-fous~:
+un mode \texttt{planar} (vitesse et position recollées au sol) et un plafond de
+vitesse.
+
+\textbf{Le guide traversait les visiteurs.} Conséquence directe~: sans collision
+mutuelle, le guide passait à travers le groupe. Plutôt que de rétablir les
+collisions, une \emph{répulsion d'espace personnel} (composant \texttt{AvoidGuide},
+et logique équivalente dans \texttt{FollowGuide}) écarte les visiteurs du chemin du
+guide dans un petit rayon. Le déclenchement utilise la distance 3D (un guide à un
+autre étage n'affecte personne) et la poussée reste horizontale.
+
+\textbf{Le cheval, ancien centre des trajectoires.} Devenu obstacle solide, le
+cheval occupait le point central vers lequel revenaient toutes les trajectoires~:
+les visiteurs s'y agglutinaient et le guide restait coincé. Le point de ralliement
+a été déplacé derrière le cheval, hors de son empreinte de collision, comme les
+positions de départ du groupe.
+
+D'autres ajustements plus ponctuels (statue traversant le sol, disques du mobile
+qui semblaient flotter faute de fils de liaison, dimensionnement des portes) ont
+été diagnostiqués à partir de captures d'écran prises pendant les tests.
+
+% ============================ 9. CONCLUSION ============================
+\section{Conclusion}
+
+Le projet aboutit à un musée virtuel cohérent sur les plans statique et
+dynamique~: un bâtiment complet (hall, salles, mezzanine, escalier, baies,
+garde-corps), habillé de matériaux variés, peuplé de tableaux, de statues
+importées et d'un mobile articulé, doté de portes réactives, et animé par des
+visiteurs autonomes jusqu'à une foule guidée. L'apport principal est
+\emph{architectural}~: une base entités--composants soignée a permis d'empiler des
+comportements (steering, arbres de comportement, flocking, évitement) par simple
+composition, et de corriger les problèmes au fur et à mesure sans jamais réécrire
+l'existant.
+
+\end{document}
