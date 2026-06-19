@@ -643,6 +643,43 @@ All:      use lookAtForward component
           use Rebond component to stay within bounds
 ```
 
+### Guide + Visitor Group — Implementation in this project
+
+Implemented in `js/world.js` (section "7bis"), reusing the ECS + steering +
+behavior-tree infrastructure. It covers cours2.pdf §6 exercises 1, 3, 4 and 5.
+
+**Guide** (`"guia"`, a `Newton` entity, visually distinct: taller, golden):
+```
+Person · Position · Trajectory(guideWaypoints) · Arrive · LookAtForward · Gaze
+       · BehaviorTree(buildGuideBT(guideStops))
+```
+- `guideRoute` is a list of waypoints; some are *stops* `{ pause, look }`
+  (in front of a painting). `guideStops` maps the waypoint index → `{pause, look}`.
+- `js/bt/guideBT.js` mirrors `visitorBT.js`: at a *stop* it pauses and publishes
+  `blackboard.lookTarget` (and `gazeTarget`); plain waypoints are crossed without
+  pausing, so the guide can lead the group from the hall into a room (Ex.5).
+
+**Followers** (8 × `Newton`, pushed into a shared `grupoGuiado` array):
+```
+Person · Position
+       · Separation(group) · Cohesion(group) · Alignment(group)   ← Reynolds rules (Ex.1)
+       · FollowGuide(guide:"guia", offset)                        ← seek a point BEHIND the guide (Ex.3b)
+       · LookAtForward · Gaze                                     ← face travel dir, or the painting
+```
+- `FollowGuide` steers (Arrive-style) toward a point `offset` metres behind the
+  guide, and relays the guide's `lookTarget` into the follower's `gazeTarget`.
+- When the guide stops at a painting, the group gathers and `Gaze` turns each
+  follower to face it (Ex.4); when the guide resumes, `gazeTarget` is cleared and
+  `LookAtForward` takes over again.
+- Doors (`autoDoor`) open for any entity with a `blackboard`, so the group can
+  cross from hall to rooms.
+
+> Confinement (Rebond) is not used here: the museum walls already confine the
+> group via `moveWithCollisions`, and the guide's route keeps it inside.
+
+> Note: `Simu.update` passes `dt` to `execute(dt)`, so behavior-tree pause timers
+> (guide stops, visitor pauses) measure real elapsed time.
+
 ---
 
 ## Quick Reference: Component Types
@@ -659,9 +696,11 @@ All:      use lookAtForward component
 | `Arrive` | Steering | Move toward a point, stop gracefully |
 | `Trajectory` | Steering | Follow N waypoints |
 | `Avoidance` | Steering | Steer away from obstacles |
-| `Separation` | Flocking | Avoid neighbors |
-| `Cohesion` | Flocking | Stay near group center |
-| `Alignment` | Flocking | Match group velocity |
+| `Separation` | Flocking | Avoid neighbors (repulsion ∝ 1/d²) |
+| `Cohesion` | Flocking | Steer toward group center of gravity |
+| `Alignment` | Flocking | Match average neighbor velocity |
+| `FollowGuide` | Steering | Seek a point behind a guide entity (Arrive) |
+| `Gaze` | Orientation | Turn to face `blackboard.gazeTarget` (e.g. a painting) |
 | `Rebond` | Constraint | Bounce off virtual box walls |
 | `LookAtForward` | Orientation | Face direction of travel |
 

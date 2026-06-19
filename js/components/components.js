@@ -19,6 +19,14 @@ import {Arrive}          from './arrive.js' ;
 import {Trajectory}      from './trajectory.js' ;
 import {LookAtForward}   from './lookAtForward.js' ;
 import {BehaviorTree}    from './behaviorTree.js' ;
+import {AutoDoor}        from './autoDoor.js' ;
+import {Mobile}          from './mobile.js' ;
+import {Separation}      from './separation.js' ;
+import {Cohesion}        from './cohesion.js' ;
+import {Alignment}       from './alignment.js' ;
+import {FollowGuide}     from './followGuide.js' ;
+import {AvoidGuide}      from './avoidGuide.js' ;
+import {Gaze}            from './gaze.js' ;
 
 const COMPS = {
     box            : Box,
@@ -40,6 +48,14 @@ const COMPS = {
     trajectory     : Trajectory,
     lookAtForward  : LookAtForward,
     behaviorTree   : BehaviorTree,
+    autoDoor       : AutoDoor,
+    mobile         : Mobile,
+    separation     : Separation,
+    cohesion       : Cohesion,
+    alignment      : Alignment,
+    followGuide    : FollowGuide,
+    avoidGuide     : AvoidGuide,
+    gaze           : Gaze,
     component      : Component
 }
 

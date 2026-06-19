@@ -416,6 +416,9 @@ function creerPorte(nom, opts, scn) {
   let hauteur = options.hauteur || 3.0; // Cambiado a 'hauteur' para ser consistente
   let largeur = options.largeur || 5.0; // Cambiado a 'largeur'
   let epaisseur = options.epaisseur || 0.1;
+  // Las hojas se hacen algo más grandes que el hueco (solapan el borde) para que,
+  // cerradas, no se vea el interior por las junturas. `marge` = sobredimensión.
+  let marge = options.marge !== undefined ? options.marge : 0.4;
   let ndoors = 1;
 
   let materiau;
@@ -435,24 +438,33 @@ function creerPorte(nom, opts, scn) {
   }
 
   for (let i = 0; i < ndoors; i++) {
-    let door = BABYLON.MeshBuilder.CreateBox(nom + "_" + i, { width: largeur / ndoors, height: hauteur, depth: epaisseur }, scn);
+    // La puerta arranca CERRADA. El solape con la pared (marge/2) va SOLO hacia
+    // los bordes expuestos: el costado exterior y arriba. El borde interior (donde
+    // las dos hojas se encuentran) queda justo en el centro, sin agrandar, para que
+    // se toquen sin superponerse. Se guardan en metadata la x cerrada y la abierta;
+    // el componente autoDoor (components/autoDoor.js) interpola entre ambas.
+    let largeurHoja, closedX, openX;
+    if (ndoors === 1) {
+      // Puerta simple: solapa el hueco por marge/2 a cada lado.
+      largeurHoja = largeur + marge;
+      closedX = 0;
+      openX = largeur * 0.9;
+    } else {
+      // Puerta doble: cada hoja cubre media abertura y solo se agranda hacia afuera.
+      largeurHoja = largeur / ndoors + marge / 2;
+      closedX = (-1 + (2 * i)) * (largeur / 4 + marge / 4);
+      openX = closedX + (-1 + (2 * i)) * (largeur / 2);
+    }
+
+    // El alto suma solo marge/2 (todo arriba, ya que la hoja se apoya en el piso),
+    // para que el solape de arriba iguale al de los costados.
+    let door = BABYLON.MeshBuilder.CreateBox(nom + "_" + i, { width: largeurHoja, height: hauteur + marge / 2, depth: epaisseur }, scn);
     door.material = materiau;
     door.parent = groupe;
-
-    // Elevación consistente con creerCloison
-    door.position.y = hauteur / 2.0;
+    door.position.y = (hauteur + marge / 2) / 2.0;
+    door.position.x = closedX;
     door.checkCollisions = true;
-
-    // Posicionamiento en X y apertura parcial (exigida en el proyecto)
-    if (ndoors === 1) {
-      // Puerta simple: se desplaza a un lado para dejar hueco
-      door.position.x = largeur * 0.4;
-    } else {
-      // Puerta doble: se calcula la posición base y se le suma un offset de apertura
-      let basePos = (-1 + (2 * i)) * (largeur / 4);
-      let offsetApertura = (-1 + (2 * i)) * (largeur * 0.3); // Abre un 20% hacia cada lado
-      door.position.x = basePos + offsetApertura;
-    }
+    door.metadata = { closedX, openX };
   }
 
   return groupe;
@@ -496,6 +508,9 @@ function creerPorte(nom, opts, scn) {
 function creerModel3D(nom, opts, scn) {
   const filename = opts.fichier || "";
   const scaling = opts.echelle || 0.1;
+  // Por defecto apoyamos el modelo sobre el suelo (su base queda en y = position.y),
+  // para evitar que se clippee con el piso cuando el pivote del .glb está en el centro.
+  const poserAuSol = opts.poserAuSol !== false;
 
   const container = new BABYLON.TransformNode("model-container-" + nom, scn);
 
@@ -511,6 +526,33 @@ function creerModel3D(nom, opts, scn) {
         }
       });
       container.scaling = new BABYLON.Vector3(scaling, scaling, scaling);
+
+      if (poserAuSol) {
+        // Tras escalar, calculamos el bounding box del modelo en el mundo para:
+        //  - apoyar su base en container.position.y (no hundirla en el piso), y
+        //  - centrar su huella horizontal sobre el eje del container, de modo que
+        //    al rotar sobre Y gire alrededor de su propio centro.
+        container.computeWorldMatrix(true);
+        const bounds = container.getHierarchyBoundingVectors(true);
+        const centreMonde = bounds.min.add(bounds.max).scale(0.5);
+        const offsetMonde = new BABYLON.Vector3(
+          container.position.x - centreMonde.x,
+          container.position.y - bounds.min.y,
+          container.position.z - centreMonde.z
+        );
+        // El desfase en mundo se traduce al espacio local dividiendo por la escala.
+        const k = scaling !== 0 ? scaling : 1;
+        const offsetLocal = offsetMonde.scale(1 / k);
+        meshes.forEach(mesh => {
+          if (mesh.parent === container) {
+            mesh.position.addInPlace(offsetLocal);
+          }
+        });
+      }
+
+      if (typeof opts.onCharge === "function") {
+        opts.onCharge(meshes, container);
+      }
     },
     null,
     function (scene, message, exception) {
@@ -578,6 +620,109 @@ function creerEtoile(nom, opts, scn) {
   return base;
 }
 
+// Móvil articulado estilo Alexander Calder: varillas horizontales colgadas en
+// cascada, cada una con un disco de color en un extremo y, en el otro, la varilla
+// inferior. Cada varilla cuelga de un pivote que gira sobre Y a su propia
+// velocidad → movimiento articulado (no un bloque rígido).
+//
+// Devuelve un TransformNode raíz (el punto de suspensión). Las varillas a animar
+// quedan en group.metadata.calderArms = [{ node, vitesse }].
+function creerCalder(nom, opts, scn) {
+  const options = opts || {};
+  // Colores primarios + negro/blanco, la paleta típica de Calder.
+  const palette = options.couleurs || ["#d62828", "#f4d35e", "#1d3557", "#222222", "#f5f5f5"];
+  const matFil = options.matFil || new BABYLON.StandardMaterial("mat_calder_fil_" + nom, scn);
+  // Gris claro para que las varillas/hilos contrasten con las paredes oscuras.
+  matFil.diffuseColor = BABYLON.Color3.FromHexString(options.couleurFil || "#c8c8c8");
+
+  const matsDisc = palette.map((hex, i) => {
+    const m = new BABYLON.StandardMaterial("mat_calder_disc_" + nom + "_" + i, scn);
+    m.diffuseColor = BABYLON.Color3.FromHexString(hex);
+    return m;
+  });
+
+  const root = new BABYLON.TransformNode("calder-" + nom, scn);
+  const arms = [];
+
+  // Cuelga un disco (cilindro aplanado) de un punto, mediante un hilo vertical.
+  function suspendreDisque(parent, x, longueurFil, diametre, mat) {
+    const fil = BABYLON.MeshBuilder.CreateBox("calder-fil-" + nom + "-" + arms.length + "-" + x, {
+      width: 0.02, height: longueurFil, depth: 0.02
+    }, scn);
+    fil.material = matFil;
+    fil.parent = parent;
+    fil.position.set(x, -longueurFil / 2, 0);
+
+    const disque = BABYLON.MeshBuilder.CreateCylinder("calder-disc-" + nom + "-" + arms.length, {
+      diameter: diametre, height: 0.03, tessellation: 32
+    }, scn);
+    disque.material = mat;
+    disque.parent = fil;
+    disque.position.set(0, -longueurFil / 2, 0);
+  }
+
+  // Dibuja un hilo vertical desde (x, 0) hacia abajo, longitud `drop`, hijo de parent.
+  function suspendreFil(parent, x, drop) {
+    const fil = BABYLON.MeshBuilder.CreateBox("calder-lien-" + nom + "-" + arms.length + "-" + x, {
+      width: 0.02, height: drop, depth: 0.02
+    }, scn);
+    fil.material = matFil;
+    fil.parent = parent;
+    fil.position.set(x, -drop / 2, 0);
+  }
+
+  // Construye recursivamente un nivel del móvil.
+  //   parent       : nodo del que cuelga este nivel
+  //   xAttache     : punto X del padre del que cuelga (extremo del brazo superior)
+  //   drop         : longitud del hilo de conexión con el padre
+  //   profondeur   : nº de niveles restantes
+  //   gauche/droite: longitudes del brazo a cada lado del pivote
+  function construireNiveau(parent, xAttache, drop, profondeur, gauche, droite, vitesse, idxCouleur) {
+    // Hilo de conexión visible entre el brazo de arriba y este nivel.
+    suspendreFil(parent, xAttache, drop);
+
+    // Pivote que gira: todo el brazo cuelga del extremo del hilo de conexión.
+    const pivot = new BABYLON.TransformNode("calder-pivot-" + nom + "-" + arms.length, scn);
+    pivot.parent = parent;
+    pivot.position.set(xAttache, -drop, 0);
+    arms.push({ node: pivot, vitesse });
+
+    // Varilla horizontal (de -gauche a +droite sobre X).
+    const longueur = gauche + droite;
+    const barre = BABYLON.MeshBuilder.CreateBox("calder-barre-" + nom + "-" + arms.length, {
+      width: longueur, height: 0.03, depth: 0.03
+    }, scn);
+    barre.material = matFil;
+    barre.parent = pivot;
+    barre.position.set((droite - gauche) / 2, 0, 0); // centra la barra entre ambos extremos
+
+    // Extremo derecho: siempre un disco de color.
+    suspendreDisque(pivot, droite, 0.5, 0.6 + 0.1 * profondeur, matsDisc[idxCouleur % matsDisc.length]);
+
+    // Extremo izquierdo: otro nivel colgante (con su hilo) si queda profundidad, si no un disco.
+    if (profondeur > 1) {
+      construireNiveau(
+        pivot, -gauche, 0.5, profondeur - 1,
+        gauche * 0.7, droite * 0.7,
+        -vitesse * 1.6,            // gira en sentido opuesto y más rápido
+        idxCouleur + 1
+      );
+    } else {
+      suspendreDisque(pivot, -gauche, 0.5, 0.45, matsDisc[(idxCouleur + 2) % matsDisc.length]);
+    }
+  }
+
+  // Primer nivel: cuelga del techo (la raíz se coloca a ras del techo) por un hilo
+  // de suspensión de longitud `suspension`, dibujado dentro de construireNiveau.
+  const suspension = options.suspension || 1.0;
+  const niveaux = options.niveaux || 3;
+  construireNiveau(root, 0, suspension, niveaux, 1.4, 2.0, options.vitesse || 0.01, 0);
+
+  root.metadata = root.metadata || {};
+  root.metadata.calderArms = arms;
+  return root;
+}
+
 const PRIMS = {
   "camera": creerCamera,
   "reticule": creerReticule,
@@ -595,6 +740,7 @@ const PRIMS = {
   "door": creerPorte,
   "model": creerModel3D,
   "star": creerEtoile,
+  "calder": creerCalder,
 }
 
 export { PRIMS }; 

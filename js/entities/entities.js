@@ -72,6 +72,13 @@ class Newton extends Entity {
   constructor(name, data, sim) {
     super(name, data, sim);
     this.mass = data.mass || 1.0;
+    // Tope opcional de rapidez: si se define, la velocidad se recorta a este
+    // módulo tras integrar las fuerzas. Útil cuando varias fuerzas (flocking)
+    // se acumulan y podrían disparar la entidad. Sin él, comportamiento igual.
+    this.maxSpeed = data.maxSpeed || 0;
+    // Movimiento planar: si está activo, la entidad se mantiene pegada al piso
+    // (y=0). Evita que las respuestas de colisión la levanten y la dejen volando.
+    this.planar = data.planar || false;
     this.velocity = new BABYLON.Vector3(0, 0, 0);
     this.force = new BABYLON.Vector3(0, 0, 0);
   }
@@ -85,10 +92,21 @@ class Newton extends Entity {
     this.force.scaleAndAddToRef(dt / this.mass, this.velocity);
     this.force.set(0, 0, 0);
 
+    if (this.maxSpeed > 0 && this.velocity.length() > this.maxSpeed) {
+      this.velocity.normalize().scaleInPlace(this.maxSpeed);
+    }
+
+    if (this.planar) this.velocity.y = 0;
+
     if (this.object3d && this.object3d.moveWithCollisions) {
       // Mesh with a collider (e.g. visitors): slide along walls like the camera does.
       this.object3d.moveWithCollisions(this.velocity.scale(dt));
       this.position.copyFrom(this.object3d.position);
+      if (this.planar) {
+        // Re-pegar al piso por si una colisión empujó la malla hacia arriba.
+        this.position.y = 0;
+        this.object3d.position.y = 0;
+      }
     } else {
       this.velocity.scaleAndAddToRef(dt, this.position);
       if (this.object3d) {

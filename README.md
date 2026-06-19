@@ -223,6 +223,32 @@ Cada frame, para esta entidad: `Arrive.execute` aplica fuerza hacia
 de waypoint → `LookAtForward.execute` orienta la malla según la velocidad →
 `Newton.update` integra la física y mueve el collider con `moveWithCollisions`.
 
+## Puertas automáticas (`autoDoor`)
+
+Las puertas correderas se abren solas cuando un agente (el jugador o un visitante)
+se acerca, y se cierran al alejarse. Sigue la directiva del curso (pág. 70,
+*"regarder régulièrement"*): en vez de un raycast puntual, la proximidad se evalúa
+en cada tick de la simulación.
+
+- **`prims.js` (`creerPorte`)**: cada puerta arranca **cerrada** y guarda en
+  `mesh.metadata` la `x` cerrada y la `x` abierta de cada hoja. Cerradas, las dos
+  hojas se tocan en el centro; abiertas, cada una desliza su propio ancho hacia su
+  lado y despeja el hueco.
+- **`components/autoDoor.js`**: mismo patrón que `Person`/`Model` (el constructor
+  construye la malla con `PRIMS.door`; `execute()` la anima cada frame). En cada
+  tick calcula la distancia horizontal del agente más cercano —la cámara más todas
+  las entidades con `blackboard` (los visitantes)— y, si es menor que `radius`,
+  interpola cada hoja hacia su `x` abierta; si no, hacia la cerrada. La
+  interpolación suave (`x += (target - x) * speed`) da el deslizamiento.
+- **`world.js`**: las 4 puertas (la principal y las 3 internas) pasan a ser
+  **entidades** `ENTITIES.entity` con el componente `COMPS.autoDoor`, en vez de
+  mallas sueltas. La detección reutiliza el `blackboard` ya existente como marca de
+  "agente perceptible", sin acoplar `autoDoor` a la clase de los visitantes.
+
+Detalle: la distancia se mide con `object3d.getAbsolutePosition()`, así funciona
+igual para la puerta principal (que cuelga de la fachada como hijo) y para las
+internas (posicionadas en coordenadas de mundo).
+
 ## Resumen de decisiones de diseño (para el informe)
 
 - **Por qué ECS y no herencia de clases por tipo de objeto**: permite combinar

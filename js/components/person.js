@@ -46,6 +46,16 @@ class Person extends Component {
 		collider.ellipsoid = new BABYLON.Vector3(largeur * 0.75, hauteur * 2.25, epaisseur * 0.75) ;
 		collider.ellipsoidOffset = new BABYLON.Vector3(0, hauteur * 2.25, 0) ;
 
+		// Las personas NO colisionan entre sí: la malla que se mueve choca con un
+		// candidato solo si (collider.collisionMask & candidato.collisionGroup)!=0.
+		// Poniéndolas en el grupo 2 con máscara 1, su máscara (1) no contiene el
+		// bit del grupo 2 → ignoran a otras personas, pero sí chocan con paredes y
+		// puertas (grupo por defecto -1 = todos los bits). Así el espaciado entre
+		// visitantes lo da solo la fuerza de separación (Reynolds) y dejan de
+		// treparse y salir volando al amontonarse o cruzar puertas estrechas.
+		collider.collisionGroup = 2 ;
+		collider.collisionMask  = 1 ;
+
 		groupe.parent = collider ;
 		groupe.position.set(0, 0, 0) ;
 

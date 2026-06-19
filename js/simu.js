@@ -14,8 +14,10 @@ class Simu extends Visu {
 
   update(dt) {
     // 1. Ejecutar la lógica de los componentes (toma de decisiones, cálculo de fuerzas)
+    //    Se pasa dt para que los componentes con temporizadores (pausas del
+    //    behavior tree, etc.) midan el tiempo real transcurrido.
     this.entities.forEach((e) => {
-      if (e.execute) e.execute();
+      if (e.execute) e.execute(dt);
     });
 
     // 2. Actualizar el estado cinemático de las entidades (aplicar movimiento)
